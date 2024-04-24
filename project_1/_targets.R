@@ -3,9 +3,9 @@
 ## Author: Thomas Alexander Gerds
 ## Created: Apr 24 2024 (11:55) 
 ## Version: 
-## Last-Updated: Apr 24 2024 (13:45) 
+## Last-Updated: Apr 24 2024 (13:56) 
 ##           By: Thomas Alexander Gerds
-##     Update #: 5
+##     Update #: 8
 #----------------------------------------------------------------------
 ## 
 ### Commentary: 
@@ -25,10 +25,15 @@ if (FALSE){
 }
 list(
     tar_target(sample_data,{
-        simulate_BMI(17)
+        # simulate BMI trajectories for 17 subjects
+        simulate_BMI(n = 17)
+    }),
+    tar_target(observed_sample_data,{
+        x = sample_data[type == "observed"][,type := NULL]
+        x[]
     }),
     tar_target(plot_sample_data,{
-        plot_BMI_trajectories(sample_data)
+        plot_BMI_trajectories(sample_data = sample_data)
     })
 )
 
