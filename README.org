@@ -1,0 +1,5 @@
+* BMI trajectories
+
+** Simulation of BMI trajectory data 
+
+Start with file =project_1/run.R= and tell us about the R-disaster if any :) 
