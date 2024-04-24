@@ -1,1 +1,0 @@
-# BMI_trajectories
