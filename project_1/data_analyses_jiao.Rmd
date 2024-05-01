@@ -24,8 +24,7 @@ fun_auc <- function(data) {
   data %>%
     arrange(id, age) %>%
     group_by(id) %>%
-    mutate(age_centered = age - first(age),
-           next_age = lead(age),
+    mutate(next_age = lead(age),
            next_bmi = lead(bmi),
            auc = if_else(!is.na(next_age), 0.5 * (bmi + next_bmi) * (next_age - age), NA_real_)) %>%
     ungroup()
@@ -47,7 +46,7 @@ sample_data <-
 ## Linear mixed model
 ```{r}
 # linear mixed model
-lmm <- lmer(observed_auc ~ age_centered + (1 + age_centered | id), data = sample_data, REML = FALSE)
+lmm <- lmer(observed_auc ~ age + age^2 + (1 + age | id), data = sample_data, REML = FALSE)
 
 # predicting auc and sum up per individual
 auc <- 
