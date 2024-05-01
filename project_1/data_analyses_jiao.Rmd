@@ -46,7 +46,7 @@ sample_data <-
 ## Linear mixed model
 ```{r}
 # linear mixed model
-lmm <- lmer(observed_auc ~ age + age^2 + (1 + age | id), data = sample_data, REML = FALSE)
+lmm <- lmer(observed_auc ~ age + I(age^2) + (1 + age | id), data = sample_data, REML = FALSE)
 
 # predicting auc and sum up per individual
 auc <- 
