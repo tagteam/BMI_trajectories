@@ -1,0 +1,75 @@
+---
+title: "project1"
+output: html_document
+date: "2024-05-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(pracma)
+library(lme4)
+```
+
+
+# Calculate AUC
+
+```{r}
+fun_auc <- function(data) {
+  
+  data %>%
+    arrange(id, age) %>%
+    group_by(id) %>%
+    mutate(age_centered = age - first(age),
+           next_age = lead(age),
+           next_bmi = lead(bmi),
+           auc = if_else(!is.na(next_age), 0.5 * (bmi + next_bmi) * (next_age - age), NA_real_)) %>%
+    ungroup()
+}
+
+observed_sample_data <- 
+  fun_auc(observed_sample_data) %>% 
+  rename('observed_auc' = 'auc')
+
+sample_data <- 
+  fun_auc(sample_data) %>% 
+  rename('true_auc' = 'auc') %>% 
+  merge(., observed_sample_data[,c('id', 'age', 'observed_auc')], by = c('id', 'age'), all = TRUE)
+```
+
+
+# Prediction
+
+## Linear mixed model
+```{r}
+# linear mixed model
+lmm <- lmer(true_auc ~ age_centered + (1 + age_centered | id), data = sample_data, REML = FALSE)
+
+# predicting auc and sum up per individual
+auc <- 
+  sample_data %>% 
+  mutate(predicted_auc = predict(lmm, newdata = sample_data, re.form = ~ (1 + age_centered | id))) %>%
+  group_by(id) %>%
+  summarise(true_auc = sum(true_auc, na.rm = T),
+           predicted_auc = sum(predicted_auc))
+```
+
+
+
+```{r}
+# Calculate Mean Squared Error (MSE)
+auc <- auc %>% mutate(MSE = (predicted_auc - true_auc)^2)
+
+boxplot(auc$MSE, 
+        main = "MSE of Predicted AUC vs. Actual AUC",
+        ylab = "MSE")
+
+cat("Median MSE:", median(auc$MSE), "\n")
+```
+
+
+
