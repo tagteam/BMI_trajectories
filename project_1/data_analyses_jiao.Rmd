@@ -47,7 +47,7 @@ sample_data <-
 ## Linear mixed model
 ```{r}
 # linear mixed model
-lmm <- lmer(true_auc ~ age_centered + (1 + age_centered | id), data = sample_data, REML = FALSE)
+lmm <- lmer(observed_auc ~ age_centered + (1 + age_centered | id), data = sample_data, REML = FALSE)
 
 # predicting auc and sum up per individual
 auc <- 
