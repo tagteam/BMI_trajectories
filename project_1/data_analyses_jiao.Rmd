@@ -66,7 +66,7 @@ auc <-
 auc <- auc %>% mutate(MSE = (predicted_auc - true_auc)^2)
 
 boxplot(auc$MSE, 
-        main = "MSE of Predicted AUC vs. Actual AUC",
+        main = "MSE of Predicted AUC vs. True AUC",
         ylab = "MSE")
 
 cat("Median MSE:", median(auc$MSE), "\n")
