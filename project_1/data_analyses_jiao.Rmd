@@ -52,6 +52,7 @@ lmm <- lmer(true_auc ~ age_centered + (1 + age_centered | id), data = sample_dat
 # predicting auc and sum up per individual
 auc <- 
   sample_data %>% 
+  subset(age != 60) %>% # no next_bmi to compute true_auc
   mutate(predicted_auc = predict(lmm, newdata = sample_data, re.form = ~ (1 + age_centered | id))) %>%
   group_by(id) %>%
   summarise(true_auc = sum(true_auc, na.rm = T),
