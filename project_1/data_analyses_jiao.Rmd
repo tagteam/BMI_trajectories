@@ -38,6 +38,7 @@ calc_AUC <- function(age, bmi){
     return(sum(delta*mid_bmi))
 }
 true_AUC <- sample_data[, .(AUC = calc_AUC(age, bmi)), by = id]
+true_AUC
 ```
 
 ## Fit a linear mixed model
@@ -49,7 +50,7 @@ specify below.
 lmm1 <- lmer(bmi ~ age + I(age^2) + (age | id), data = observed_sample_data)
 ```
 
-The model warns that it failed to convergence, but I don't know if this is
+The model warns that it failed to converge, but I don't know if this is
 problematic. When looking at the results below it does not seem like anything
 went wrong.
 
