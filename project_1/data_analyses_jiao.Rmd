@@ -8,13 +8,107 @@ date: "2024-05-01"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-
+# Packages
 ```{r}
 library(tidyverse)
 library(pracma)
 library(lme4)
+library(targets)
+library(here)
+library(data.table)
+library(ggplot2)
+```
+	
+# Code from Anders
+## Load the data
+
+``` R
+tar_load(c(observed_sample_data, sample_data), store = here("project_1/_targets"))
 ```
 
+## Get the true AUC for each individual
+
+We first use the true curves to calculate the true AUC for each individual using
+the trapezoidal rule:
+
+``` R
+calc_AUC <- function(age, bmi){
+    delta = diff(age)
+    mid_bmi = (bmi[-1] + bmi[-length(bmi)])/2
+    return(sum(delta*mid_bmi))
+}
+true_AUC <- sample_data[, .(AUC = calc_AUC(age, bmi)), by = id]
+```
+
+## Fit a linear mixed model
+
+We fit a simple linear mixed model to the data. Here I use the same model as you
+specify below.
+
+``` R
+lmm1 <- lmer(bmi ~ age + I(age^2) + (age | id), data = observed_sample_data)
+```
+
+The model warns that it failed to convergence, but I don't know if this is
+problematic. When looking at the results below it does not seem like anything
+went wrong.
+
+We can visualize the results from the model and compare to the observed data as
+follows. The black dots are the observed data, the blue lines are the inter- and
+extrapolation made by the linear mixed model.
+
+``` R
+pred_grid1 <- expand.grid(id = unique(observed_sample_data[, id]),
+                         age = seq(40, 60, length.out = 100))
+setDT(pred_grid1)
+pred_grid1[, bmi := predict(lmm1, newdata = .SD)]
+plot_lmm1 <- ggplot(data = observed_sample_data, aes(x = age, y = bmi)) +
+    theme_bw() +
+    facet_wrap(~id) +
+    geom_point() +
+    geom_line(data = pred_grid1, color = "blue")
+plot_lmm1
+```
+
+We can also compare the fitted model to the true curves.
+
+``` R
+plot_lmm1 + geom_line(data = sample_data)
+```
+
+## Estimate the AUC based on the fitted linear mixed model
+Using the predicted BMI values from the linear mixed model we can obtain the AUC
+for each individual according to the fitted linear mixed model:
+
+``` R
+est_AUC1 <- pred_grid1[, .(AUC = calc_AUC(age, bmi)), by = id]
+est_AUC1
+```
+
+We can compare the estimated individual AUC's to the true individual AUC's. The
+black dots are the true individual AUC's and the blue dots are the estimated
+ones. The red curve illustrates the estimation error.
+
+``` R
+AUC_error1 <- merge(true_AUC[, .(id, true_AUC = AUC)], est_AUC1[, .(id, est_AUC = AUC)], by = "id")
+AUC_error1[, error := true_AUC-est_AUC]
+ggplot(AUC_error1, aes(x = id)) +
+    theme_bw() +
+    geom_segment(aes(xend = id, y = true_AUC, yend = est_AUC), col = "red") + 
+    geom_point(aes(y = true_AUC), col = "black") +
+    geom_point(aes(y = est_AUC), col = "blue")  +
+    ylab("AUC")
+```
+
+We can also look at the bias and the variance of the estimator:
+
+``` R
+mean(true_AUC[, AUC] -est_AUC1[, AUC]) # Bias
+var(est_AUC1[, AUC]) # standard deviation 
+```
+
+But I think we need to think a bit about how we compare performance, because
+this is looking at the bias and variance across individuals.
 
 # Calculate AUC
 
