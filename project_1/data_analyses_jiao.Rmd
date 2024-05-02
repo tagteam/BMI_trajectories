@@ -22,7 +22,7 @@ library(ggplot2)
 # Code from Anders
 ## Load the data
 
-``` R
+```{r}
 tar_load(c(observed_sample_data, sample_data), store = here("project_1/_targets"))
 ```
 
@@ -31,7 +31,7 @@ tar_load(c(observed_sample_data, sample_data), store = here("project_1/_targets"
 We first use the true curves to calculate the true AUC for each individual using
 the trapezoidal rule:
 
-``` R
+```{r}
 calc_AUC <- function(age, bmi){
     delta = diff(age)
     mid_bmi = (bmi[-1] + bmi[-length(bmi)])/2
@@ -46,7 +46,7 @@ true_AUC
 We fit a simple linear mixed model to the data. Here I use the same model as you
 specify below.
 
-``` R
+```{r}
 lmm1 <- lmer(bmi ~ age + I(age^2) + (age | id), data = observed_sample_data)
 ```
 
@@ -58,7 +58,7 @@ We can visualize the results from the model and compare to the observed data as
 follows. The black dots are the observed data, the blue lines are the inter- and
 extrapolation made by the linear mixed model.
 
-``` R
+```{r}
 pred_grid1 <- expand.grid(id = unique(observed_sample_data[, id]),
                          age = seq(40, 60, length.out = 100))
 setDT(pred_grid1)
@@ -73,7 +73,7 @@ plot_lmm1
 
 We can also compare the fitted model to the true curves.
 
-``` R
+```{r}
 plot_lmm1 + geom_line(data = sample_data)
 ```
 
@@ -81,7 +81,7 @@ plot_lmm1 + geom_line(data = sample_data)
 Using the predicted BMI values from the linear mixed model we can obtain the AUC
 for each individual according to the fitted linear mixed model:
 
-``` R
+```{r}
 est_AUC1 <- pred_grid1[, .(AUC = calc_AUC(age, bmi)), by = id]
 est_AUC1
 ```
@@ -90,7 +90,7 @@ We can compare the estimated individual AUC's to the true individual AUC's. The
 black dots are the true individual AUC's and the blue dots are the estimated
 ones. The red curve illustrates the estimation error.
 
-``` R
+```{r}
 AUC_error1 <- merge(true_AUC[, .(id, true_AUC = AUC)], est_AUC1[, .(id, est_AUC = AUC)], by = "id")
 AUC_error1[, error := true_AUC-est_AUC]
 ggplot(AUC_error1, aes(x = id)) +
@@ -103,7 +103,7 @@ ggplot(AUC_error1, aes(x = id)) +
 
 We can also look at the bias and the variance of the estimator:
 
-``` R
+```{r}
 mean(true_AUC[, AUC] -est_AUC1[, AUC]) # Bias
 var(est_AUC1[, AUC]) # standard deviation 
 ```
