@@ -3,9 +3,9 @@
 ## Author: Thomas Alexander Gerds
 ## Created: Apr 24 2024 (11:55) 
 ## Version: 
-## Last-Updated: Apr 24 2024 (13:56) 
+## Last-Updated: Oct  1 2024 (12:04) 
 ##           By: Thomas Alexander Gerds
-##     Update #: 8
+##     Update #: 11
 #----------------------------------------------------------------------
 ## 
 ### Commentary: 
@@ -30,10 +30,14 @@ list(
     }),
     tar_target(observed_sample_data,{
         x = sample_data[type == "observed"][,type := NULL]
+        x[,number_of_measurements := .N,by = "id"]
         x[]
     }),
     tar_target(plot_sample_data,{
         plot_BMI_trajectories(sample_data = sample_data)
+    }),
+    tar_target(summary_statistics,{
+        calculate_summary_statistics(data = observed_sample_data[number_of_measurements>1])
     })
 )
 
