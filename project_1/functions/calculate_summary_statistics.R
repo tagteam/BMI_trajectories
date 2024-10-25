@@ -49,15 +49,26 @@ calculate_summary_statistics <- function(data){
         AUC_18 = calc_AUC_threshold(age,bmi,threshold = 18)
         AUC_25 = calc_AUC_threshold(age,bmi,threshold = 25)
         AUC_30 = calc_AUC_threshold(age,bmi,threshold = 30)
-        .(AUC = AUC,
+        count = .N
+        Number_of_group_changes = 
+          length(get_crossing_times(time = age,measurements = bmi,threshold = 18))+ 
+          length(get_crossing_times(time = age,measurements = bmi,threshold = 25))+ 
+          length(get_crossing_times(time = age,measurements = bmi,threshold = 30))
+        .(count = count,
+          AUC = AUC,
+          AUC_25 = AUC_25,
+          AUC_30 = AUC_30,
           TotalVariation = sum(abs(diff(bmi))),
           Resilience_normal = AUC_18-AUC_25,
           Resilience_overweight_or_obesity = AUC_25,
           Resilience_obesity = AUC_30,
           Coefficient_of_variation = sd(bmi)/mean(bmi),
-          Number_of_group_changes = length(get_crossing_times(time = age,measurements = bmi,threshold = 18))+ length(get_crossing_times(time = age,measurements = bmi,threshold = 25))+ length(get_crossing_times(time = age,measurements = bmi,threshold = 30)),
+          Number_of_group_changes = Number_of_group_changes,
+          Percentage_of_group_changes = Number_of_group_changes/count,
           Number_of_relative_changes05 = sum(diff(bmi)/bmi[-1]>0.05),
+          Percentage_of_relative_changes05 = sum(diff(bmi)/bmi[-1]>0.05)/count,
           Number_of_relative_changes10 = sum(diff(bmi)/bmi[-1]>0.1),
+          Percentage_of_relative_changes10 = sum(diff(bmi)/bmi[-1]>0.1)/count,
           Total_velocity = (bmi[length(bmi)]-bmi[1])/(age_interval_length),
           First_velocity = (bmi[2]-bmi[1])/(age[2]-age[1])
           )

@@ -1,0 +1,304 @@
+---
+title: "project1"
+output: html_document
+date: "2024-05-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Packages
+```{r}
+library(tidyverse)
+library(pracma)
+library(lme4)
+library(targets)
+library(here)
+library(data.table)
+library(ggplot2)
+```
+	
+# Code from Anders
+## Load the data
+
+```{r}
+# tar_load(c(observed_sample_data, sample_data), store = here("project_1/_targets"))
+```
+
+
+```{r}
+sample_data[, source := "Sample"]
+observed_sample_data[, source := "Observed"]
+
+
+combined_data <- rbind(sample_data[, -3], observed_sample_data[,-4])
+
+ggplot(combined_data, aes(x = age, y = bmi, color = source, group = source)) +
+  geom_line(size = 1.2) +  
+  labs(x = "Age", y = "Average BMI", title = "BMI Trends by Age in Sample and Observed Data") +
+  theme_bw() +
+  theme(legend.position = "top")
+```
+
+
+## calculate the summary statistics
+```{r}
+# For the sample_data
+res_calculate_summary_statistics <- calculate_summary_statistics(data = sample_data)
+
+# For the observed_sample_data
+res_calculate_summary_statistics_observed <- calculate_summary_statistics(data = observed_sample_data)
+```
+
+
+## Compare the summary statistics
+```{r}
+# Merge the two datasets by "id"
+comparison <- merge(
+  res_calculate_summary_statistics, 
+  res_calculate_summary_statistics_observed, 
+  by = "id", 
+  suffixes = c("_sample", "_observed")
+)
+
+
+metrics <- colnames(res_calculate_summary_statistics)[-c(1:2)]
+
+RMSE_results_by_group <- list()
+overall_RMSE_results <- list()
+
+for (metric in metrics) {
+  sample_col <- paste0(metric, "_sample")
+  observed_col <- paste0(metric, "_observed")
+  squared_diff_col <- paste0(metric, "_squared_diff")
+  RMSE_col <- paste0(metric, "_RMSE")  
+  
+  comparison[[squared_diff_col]] <- (comparison[[sample_col]] - comparison[[observed_col]])^2
+  
+  RMSE_by_group <- comparison[, 
+                              .(Root_Mean_Squared_Error = sqrt(mean(get(squared_diff_col), na.rm = TRUE)), 
+                                group = count_observed), 
+                              by = count_observed]
+  
+  RMSE_results_by_group[[RMSE_col]] <- RMSE_by_group$Root_Mean_Squared_Error
+  
+  overall_RMSE_value <- sqrt(mean(comparison[[squared_diff_col]], na.rm = TRUE))
+  overall_RMSE_results[[RMSE_col]] <- overall_RMSE_value
+}
+
+
+RMSE_results_by_group_df <- as.data.frame(RMSE_results_by_group)
+RMSE_results_by_group_df$group <- unique(comparison$count_observed)
+
+overall_RMSE_results_df <- as.data.frame(overall_RMSE_results)
+overall_RMSE_results_df$group <- "Overall"
+
+
+RMSE_results <- 
+  rbind(RMSE_results_by_group_df, overall_RMSE_results_df) %>%
+  mutate(group = factor(group, levels = c(1:7, "Overall"))) %>%
+  arrange(group)
+RMSE_results
+```
+
+
+```{r}
+RMSE_long <- melt(RMSE_results, 
+                  id.vars = "group", 
+                  variable.name = "Variable", 
+                  value.name = "RMSE") 
+
+RMSE_filtered <- subset(RMSE_long, group != 'Overall' & group != 1)
+
+ggplot(subset(RMSE_long, group != '1'), aes(x = group, y = RMSE)) +
+  geom_point(aes(color = ifelse(group == "Overall", "Overall", "Other")), size = 3, show.legend = FALSE) +  
+  geom_line(data = RMSE_filtered, aes(group = Variable), size = 1) + 
+  labs(x = "Group", y = "RMSE", title = "RMSE of Each Variable") +
+  facet_wrap(~Variable, scales = "free_y") + 
+  scale_color_manual(values = c("Overall" = "red", "Other" = "black")) +
+  theme_bw()
+
+ggsave("RMSE.pdf", width = 15, height = 10, dpi = 300)
+```
+
+
+```{r}
+summary_stats <- function(x) {
+  c(
+    Mean = mean(x, na.rm = TRUE),
+    SD = sd(x, na.rm = TRUE),
+    Q25 = quantile(x, 0.25, na.rm = TRUE), 
+    Median = median(x, na.rm = TRUE),
+    Q75 = quantile(x, 0.75, na.rm = TRUE),  
+    Min = min(x, na.rm = TRUE),
+    Max = max(x, na.rm = TRUE)
+  )
+}
+
+summary_results <- sapply(c(paste0(metrics, '_sample'), paste0(metrics, '_observed')), 
+                          function(col) summary_stats(comparison[[col]]))%>% as.data.frame()
+
+summary_results
+```
+
+
+## Box plot
+```{r}
+# Melt the comparison dataset to long format
+comparison_melted <- melt(comparison, 
+                          id.vars = "id", 
+                          measure.vars = c(paste0(metrics, '_sample'),paste0(metrics, '_observed')), 
+                          variable.name = "metric_type", 
+                          value.name = "value")[value != 0]
+
+setDT(comparison_melted)
+comparison_melted[, source := ifelse(grepl("_sample$", metric_type), "Sample", "Observed")]
+comparison_melted[, metric := gsub("_sample|_observed", "", metric_type)]
+
+# Plot using ggplot2
+ggplot(comparison_melted, aes(y = value, fill = source, x = source)) +
+  geom_boxplot() + 
+  facet_wrap(~metric, scales = "free_y") +  # Free scale on Y axis for each plot
+  theme_minimal() +
+  labs(x = "source", y = "value", fill = "source", title = "Comparison between the sample data and observed data") +
+  scale_fill_manual(values = c("Sample" = "blue", "Observed" = "red")) +
+  theme_bw()+
+  theme(legend.position = "top")
+
+ggsave("box_plots_nozero.pdf", width = 12, height = 12, dpi = 300)
+```
+
+
+
+We first use the true curves to calculate the true AUC for each individual using
+the trapezoidal rule:
+
+
+## Fit a linear mixed model
+
+We fit a simple linear mixed model to the data. Here I use the same model as you
+specify below.
+
+```{r}
+lmm1 <- lmer(bmi ~ age + I(age^2) + (age | id), data = observed_sample_data)
+```
+
+The model warns that it failed to converge, but I don't know if this is
+problematic. When looking at the results below it does not seem like anything
+went wrong.
+
+We can visualize the results from the model and compare to the observed data as
+follows. The black dots are the observed data, the blue lines are the inter- and
+extrapolation made by the linear mixed model.
+
+```{r}
+pred_grid1 <- expand.grid(id = unique(observed_sample_data[, id]),
+                         age = seq(40, 60, length.out = 100))
+setDT(pred_grid1)
+pred_grid1[, bmi := predict(lmm1, newdata = .SD)]
+plot_lmm1 <- ggplot(data = observed_sample_data, aes(x = age, y = bmi)) +
+    theme_bw() +
+    facet_wrap(~id) +
+    geom_point() +
+    geom_line(data = pred_grid1, color = "blue")
+plot_lmm1
+```
+
+We can also compare the fitted model to the true curves.
+
+```{r}
+plot_lmm1 + geom_line(data = sample_data)
+```
+
+## Estimate the AUC based on the fitted linear mixed model
+Using the predicted BMI values from the linear mixed model we can obtain the AUC
+for each individual according to the fitted linear mixed model:
+
+```{r}
+est_AUC1 <- pred_grid1[, .(AUC = calc_AUC(age, bmi)), by = id]
+est_AUC1
+```
+
+We can compare the estimated individual AUC's to the true individual AUC's. The
+black dots are the true individual AUC's and the blue dots are the estimated
+ones. The red curve illustrates the estimation error.
+
+```{r}
+AUC_error1 <- merge(true_AUC[, .(id, true_AUC = AUC)], est_AUC1[, .(id, est_AUC = AUC)], by = "id")
+AUC_error1[, error := true_AUC-est_AUC]
+ggplot(AUC_error1, aes(x = id)) +
+    theme_bw() +
+    geom_segment(aes(xend = id, y = true_AUC, yend = est_AUC), col = "red") + 
+    geom_point(aes(y = true_AUC), col = "black") +
+    geom_point(aes(y = est_AUC), col = "blue")  +
+    ylab("AUC")
+```
+
+We can also look at the bias and the variance of the estimator:
+
+```{r}
+mean(true_AUC[, AUC] -est_AUC1[, AUC]) # Bias
+var(est_AUC1[, AUC]) # standard deviation 
+```
+
+But I think we need to think a bit about how we compare performance, because
+this is looking at the bias and variance across individuals.
+
+# Calculate AUC
+
+```{r}
+fun_auc <- function(data) {
+  
+  data %>%
+    arrange(id, age) %>%
+    group_by(id) %>%
+    mutate(next_age = lead(age),
+           next_bmi = lead(bmi),
+           auc = if_else(!is.na(next_age), 0.5 * (bmi + next_bmi) * (next_age - age), NA_real_)) %>%
+    ungroup()
+}
+
+observed_sample_data <- 
+  fun_auc(observed_sample_data) %>% 
+  rename('observed_auc' = 'auc')
+
+sample_data <- 
+  fun_auc(sample_data) %>% 
+  rename('true_auc' = 'auc') %>% 
+  merge(., observed_sample_data[,c('id', 'age', 'observed_auc')], by = c('id', 'age'), all = TRUE)
+```
+
+
+# Prediction
+
+## Linear mixed model
+```{r}
+# linear mixed model
+lmm <- lmer(observed_auc ~ age + I(age^2) + (1 + age | id), data = sample_data, REML = FALSE)
+
+# predicting auc and sum up per individual
+auc <- 
+  sample_data %>% 
+  subset(age != 60) %>% # no next_bmi to compute true_auc
+  mutate(predicted_auc = predict(lmm, newdata = sample_data, re.form = ~ (1 + age_centered | id))) %>%
+  group_by(id) %>%
+  summarise(true_auc = sum(true_auc, na.rm = T),
+           predicted_auc = sum(predicted_auc))
+```
+
+
+
+```{r}
+# Calculate Mean Squared Error (MSE)
+auc <- auc %>% mutate(MSE = (predicted_auc - true_auc)^2)
+
+boxplot(auc$MSE, 
+        main = "MSE of Predicted AUC vs. True AUC",
+        ylab = "MSE")
+
+cat("Median MSE:", median(auc$MSE), "\n")
+```
+
+
+

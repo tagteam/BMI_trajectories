@@ -14,14 +14,16 @@
 #----------------------------------------------------------------------
 ## 
 ### Code:
-try(setwd("~/research/Epidemi/BMI_trajectories/project_1/"))
+# try(setwd("~/research/Epidemi/BMI_trajectories/project_1/"))
+try(setwd("L:/LovbeskyttetMapper/Researchproject/Project5_Trajectories/BMI_trajectories/project_1/"))
+
 library(targets)
 # run all targets
 tar_make()
 # load the targets
 tar_load_everything()
 # look at the trajectories where the observation points are marked 
-plot_sample_data
+# plot_sample_data
 # look at the observed data (long format)
 observed_sample_data
 

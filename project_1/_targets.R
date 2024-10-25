@@ -14,7 +14,9 @@
 #----------------------------------------------------------------------
 ## 
 ### Code:
-try(setwd("~/research/Epidemi/BMI_trajectories/project_1/"))
+try(setwd("~/research/Epidemi/BMI_trajectories/project_1/"),silent=TRUE)
+try(setwd("L:/LovbeskyttetMapper/Researchproject/Project5_Trajectories/BMI_trajectories/project_1/"))
+
 library(targets)
 tar_source("functions")
 tar_option_set(packages = c("mvtnorm","data.table","ggplot2"))
@@ -26,7 +28,7 @@ if (FALSE){
 list(
     tar_target(sample_data,{
         # simulate BMI trajectories for 17 subjects
-        simulate_BMI(n = 17)
+        simulate_BMI(n = 10000)
     }),
     tar_target(observed_sample_data,{
         x = sample_data[type == "observed"][,type := NULL]
