@@ -23,85 +23,22 @@ library(ggplot2)
 ## Load the data
 
 ```{r}
-# tar_load(c(observed_sample_data, sample_data), store = here("project_1/_targets"))
+tar_load(c(observed_sample_data, sample_data,summary_statistics), store = here("project_1/_targets"))
 ```
-
-
-```{r}
-sample_data[, source := "Sample"]
-observed_sample_data[, source := "Observed"]
-
-
-combined_data <- rbind(sample_data[, -3], observed_sample_data[,-4])
-
-ggplot(combined_data, aes(x = age, y = bmi, color = source, group = source)) +
-  geom_line(size = 1.2) +  
-  labs(x = "Age", y = "Average BMI", title = "BMI Trends by Age in Sample and Observed Data") +
-  theme_bw() +
-  theme(legend.position = "top")
-```
-
-
-## calculate the summary statistics
-```{r}
-# For the sample_data
-res_calculate_summary_statistics <- calculate_summary_statistics(data = sample_data)
-
-# For the observed_sample_data
-res_calculate_summary_statistics_observed <- calculate_summary_statistics(data = observed_sample_data)
-```
-
 
 ## Compare the summary statistics
+
 ```{r}
-# Merge the two datasets by "id"
-comparison <- merge(
-  res_calculate_summary_statistics, 
-  res_calculate_summary_statistics_observed, 
-  by = "id", 
-  suffixes = c("_sample", "_observed")
-)
-
-
-metrics <- colnames(res_calculate_summary_statistics)[-c(1:2)]
-
-RMSE_results_by_group <- list()
-overall_RMSE_results <- list()
-
-for (metric in metrics) {
-  sample_col <- paste0(metric, "_sample")
-  observed_col <- paste0(metric, "_observed")
-  squared_diff_col <- paste0(metric, "_squared_diff")
-  RMSE_col <- paste0(metric, "_RMSE")  
-  
-  comparison[[squared_diff_col]] <- (comparison[[sample_col]] - comparison[[observed_col]])^2
-  
-  RMSE_by_group <- comparison[, 
-                              .(Root_Mean_Squared_Error = sqrt(mean(get(squared_diff_col), na.rm = TRUE)), 
-                                group = count_observed), 
-                              by = count_observed]
-  
-  RMSE_results_by_group[[RMSE_col]] <- RMSE_by_group$Root_Mean_Squared_Error
-  
-  overall_RMSE_value <- sqrt(mean(comparison[[squared_diff_col]], na.rm = TRUE))
-  overall_RMSE_results[[RMSE_col]] <- overall_RMSE_value
-}
-
-
-RMSE_results_by_group_df <- as.data.frame(RMSE_results_by_group)
-RMSE_results_by_group_df$group <- unique(comparison$count_observed)
-
-overall_RMSE_results_df <- as.data.frame(overall_RMSE_results)
-overall_RMSE_results_df$group <- "Overall"
-
-
-RMSE_results <- 
-  rbind(RMSE_results_by_group_df, overall_RMSE_results_df) %>%
-  mutate(group = factor(group, levels = c(1:7, "Overall"))) %>%
-  arrange(group)
-RMSE_results
+# root mean squared error
+RMSE <- summary_statistics[,sqrt(mean((gold_standard-observed)^2, na.rm = TRUE)),by = "statistic"]
 ```
 
+```{r}
+library(ggplot2)
+d <- summary_statistics[statistic == "AUC"]
+g <- ggplot(d,aes(y = observed,x = gold_standard))+geom_point()+facet_grid(~Number_of_BMI_measurements)
+g+xlim(250,750)+ylim(250,750)+geom_abline(intercept = 0,slope = 1,color = 2)
+```
 
 ```{r}
 RMSE_long <- melt(RMSE_results, 

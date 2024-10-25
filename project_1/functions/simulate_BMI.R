@@ -3,9 +3,9 @@
 ## Author: Thomas Alexander Gerds
 ## Created: Apr 24 2024 (11:56) 
 ## Version: 
-## Last-Updated: Apr 24 2024 (12:17) 
+## Last-Updated: Oct 25 2024 (12:07) 
 ##           By: Thomas Alexander Gerds
-##     Update #: 1
+##     Update #: 4
 #----------------------------------------------------------------------
 ## 
 ### Commentary: 
@@ -33,7 +33,11 @@ simulate_BMI <- function(n){
                 exp(-(age-a)^2/100)
             })
             ## Step 2: Simulate from a multivariate Gaussion distribution with this kernel
-            BMI = 25+2*c(mvtnorm::rmvnorm(1,sigma=Sigma))
+            ## the runif(1,-2,5) part sets a random intercept between 23 and 30
+            ## the runif(1,0,1) part increases the variability with a random value between 0 and 1
+            random_intercept <- runif(1,-2,5)
+            random_variation <- runif(1,0,1)
+            BMI = 25+random_intercept+2*c(mvtnorm::rmvnorm(1,sigma=Sigma+random_variation))
             return(BMI)
         }]
         out[]
