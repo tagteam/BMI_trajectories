@@ -2,3 +2,5 @@ _targets/
 Mailbox/
 org/
 .Rproj.user
+.Rhistory
+*.Rproj
