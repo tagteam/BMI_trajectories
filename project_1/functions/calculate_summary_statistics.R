@@ -55,13 +55,15 @@ calculate_summary_statistics <- function(data){
             length(get_crossing_times(time = age,measurements = bmi,threshold = 18))+ 
             length(get_crossing_times(time = age,measurements = bmi,threshold = 25))+ 
             length(get_crossing_times(time = age,measurements = bmi,threshold = 30))
-        result <- rbind(data.table(statistic = "AUC", value = AUC),
+        result <- rbind(data.table(statistic = "FirstBMI", value = bmi[1]),
+                        data.table(statistic = "LastBMI", value = bmi[length(bmi)]),
+                        data.table(statistic = "AUC", value = AUC),
                         data.table(statistic = "AUC above 25", value = AUC_25),
                         data.table(statistic = "AUC above 30", value = AUC_30),
-                        data.table(statistic = "TotalVariation", value = sum(abs(diff(bmi)))),
-                        data.table(statistic = "Resilience normal",value = AUC_18),
-                        data.table(statistic = "Resilience overweight or obesity", value=AUC-AUC_18),
-                        data.table(statistic = "Resilience obesity", value=AUC-AUC_25),
+                        data.table(statistic = "TotalVariation", value = sum(abs(diff(bmi)))/bmi[1]),
+                        # data.table(statistic = "Resilience normal",value = AUC_18),
+                        # data.table(statistic = "Resilience overweight or obesity", value=AUC-AUC_18),
+                        # data.table(statistic = "Resilience obesity", value=AUC-AUC_25),
                         data.table(statistic = "Coefficient of variation", value=sd(bmi)/mean(bmi)),
                         data.table(statistic = "Number of BMI category changes",value = Number_of_group_changes),
                         data.table(statistic = "Percentage of group changes",value = Number_of_group_changes/count),
