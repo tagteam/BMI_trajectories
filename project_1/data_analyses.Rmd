@@ -30,212 +30,100 @@ tar_load(c(observed_sample_data, sample_data,summary_statistics), store = here("
 
 ```{r}
 # root mean squared error
-RMSE <- summary_statistics[,sqrt(mean((gold_standard-observed)^2, na.rm = TRUE)),by = "statistic"]
-```
+rmse <- summary_statistics[,sqrt(mean((gold_standard-observed)^2, na.rm = TRUE)), by = c("statistic", "Number_of_BMI_measurements")]%>%
+  rename(rmse = V1)  %>%
+  subset(!is.na(Number_of_BMI_measurements)) 
 
-```{r}
-library(ggplot2)
-d <- summary_statistics[statistic == "AUC"]
-g <- ggplot(d,aes(y = observed,x = gold_standard))+geom_point()+facet_grid(~Number_of_BMI_measurements)
-g+xlim(250,750)+ylim(250,750)+geom_abline(intercept = 0,slope = 1,color = 2)
-```
-
-```{r}
-RMSE_long <- melt(RMSE_results, 
-                  id.vars = "group", 
-                  variable.name = "Variable", 
-                  value.name = "RMSE") 
-
-RMSE_filtered <- subset(RMSE_long, group != 'Overall' & group != 1)
-
-ggplot(subset(RMSE_long, group != '1'), aes(x = group, y = RMSE)) +
-  geom_point(aes(color = ifelse(group == "Overall", "Overall", "Other")), size = 3, show.legend = FALSE) +  
-  geom_line(data = RMSE_filtered, aes(group = Variable), size = 1) + 
-  labs(x = "Group", y = "RMSE", title = "RMSE of Each Variable") +
-  facet_wrap(~Variable, scales = "free_y") + 
-  scale_color_manual(values = c("Overall" = "red", "Other" = "black")) +
-  theme_bw()
-
-ggsave("RMSE.pdf", width = 15, height = 10, dpi = 300)
+ggplot(rmse, aes(y = rmse, x = Number_of_BMI_measurements, group = statistic)) +
+  geom_point(size = 2) +  
+  geom_line(color = "black", size = 1) +  # Connect points with lines
+  # geom_smooth(method = "loess", color = "red", linetype = "dashed", se = FALSE) +  # Add smooth trend
+  facet_wrap(~statistic, scales = "free", ncol = 5) +  
+  theme_bw() +
+  labs(x = "Number of BMI Measurements", y = "RMSE", title = "RMSE Trends by Statistic")+
+  scale_x_discrete(breaks = seq(0, 50, by = 5))+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    legend.position = "top",
+    axis.title = element_text(size = 16, face = "bold"),
+    strip.text = element_text(size = 12, face = "bold"),  # Improve facet labels readability
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) 
+ggsave('rmse_trend.pdf', width = 20, height = 12, dpi = 300)
 ```
 
 
 ```{r}
-summary_stats <- function(x) {
-  c(
-    Mean = mean(x, na.rm = TRUE),
-    SD = sd(x, na.rm = TRUE),
-    Q25 = quantile(x, 0.25, na.rm = TRUE), 
-    Median = median(x, na.rm = TRUE),
-    Q75 = quantile(x, 0.75, na.rm = TRUE),  
-    Min = min(x, na.rm = TRUE),
-    Max = max(x, na.rm = TRUE)
-  )
-}
+rmse_table <- 
+  rmse%>%
+  arrange(statistic, Number_of_BMI_measurements) %>%
+  pivot_wider(names_from = Number_of_BMI_measurements, values_from = rmse)
 
-summary_results <- sapply(c(paste0(metrics, '_sample'), paste0(metrics, '_observed')), 
-                          function(col) summary_stats(comparison[[col]]))%>% as.data.frame()
-
-summary_results
+writexl::write_xlsx(rmse_table, 'rmse_table.xlsx')
 ```
 
+## Plot the observed and golden standard
 
-## Box plot
 ```{r}
-# Melt the comparison dataset to long format
-comparison_melted <- melt(comparison, 
-                          id.vars = "id", 
-                          measure.vars = c(paste0(metrics, '_sample'),paste0(metrics, '_observed')), 
-                          variable.name = "metric_type", 
-                          value.name = "value")[value != 0]
-
-setDT(comparison_melted)
-comparison_melted[, source := ifelse(grepl("_sample$", metric_type), "Sample", "Observed")]
-comparison_melted[, metric := gsub("_sample|_observed", "", metric_type)]
+summary_statistics <- 
+  summary_statistics %>%
+  mutate(statistic = factor(statistic,
+                            levels = c("First measured BMI",  "Last measured BMI", 
+                                       "AUC",  "AUC (BMI>=25)", "AUC (BMI>=30)", 
+                                       "First velocity", "Total velocity", "Total variation", 
+                                       "Percentage of time (BMI<25)",  "Percentage of time (BMI>=25)",  "Percentage of time (BMI>=30)", 
+                                       "Coefficient of variation", 
+                                       "Percentage of BMI group changes", "Percentage of relative changes>=5%",  "Percentage of relative changes>=10%"),
+                            ordered = TRUE))
 
 # Plot using ggplot2
-ggplot(comparison_melted, aes(y = value, fill = source, x = source)) +
-  geom_boxplot() + 
-  facet_wrap(~metric, scales = "free_y") +  # Free scale on Y axis for each plot
-  theme_minimal() +
-  labs(x = "source", y = "value", fill = "source", title = "Comparison between the sample data and observed data") +
-  scale_fill_manual(values = c("Sample" = "blue", "Observed" = "red")) +
-  theme_bw()+
-  theme(legend.position = "top")
-
-ggsave("box_plots_nozero.pdf", width = 12, height = 12, dpi = 300)
+ggplot(summary_statistics, aes(y = observed, x = gold_standard)) +
+  geom_point(size = 1) +  
+  facet_wrap(~statistic, scales = "free", ncol = 5) +  
+  geom_abline(slope = 1, intercept = 0, color = "red", size = 1) +
+  geom_smooth(method = "lm", color = "blue", size = 1) +
+  labs(
+    x = "gold_standard",
+    y = "observed",
+    title = "Comparison between the summary statistics based on True and Observed data"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, face = "bold"),
+    legend.position = "top",
+    axis.title = element_text(size = 16, face = "bold"),
+    strip.text = element_text(size = 12, face = "bold"),  # Improve facet labels readability
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+  ggsave("comparison of summary statistics between true and observed value.pdf", width = 20, height = 12, dpi = 300)
 ```
 
 
-
-We first use the true curves to calculate the true AUC for each individual using
-the trapezoidal rule:
-
-
-## Fit a linear mixed model
-
-We fit a simple linear mixed model to the data. Here I use the same model as you
-specify below.
-
 ```{r}
-lmm1 <- lmer(bmi ~ age + I(age^2) + (age | id), data = observed_sample_data)
-```
+df_plot <- subset(observed_sample_data, id %in% c(1:100))
+unique_ids <- unique(df_plot$id)
+n_ids <- length(unique_ids)
+n_pages <- ceiling(n_ids / 20)
 
-The model warns that it failed to converge, but I don't know if this is
-problematic. When looking at the results below it does not seem like anything
-went wrong.
+pdf("observed_individual_trajectory.pdf", width = 20, height = 12)
 
-We can visualize the results from the model and compare to the observed data as
-follows. The black dots are the observed data, the blue lines are the inter- and
-extrapolation made by the linear mixed model.
-
-```{r}
-pred_grid1 <- expand.grid(id = unique(observed_sample_data[, id]),
-                         age = seq(40, 60, length.out = 100))
-setDT(pred_grid1)
-pred_grid1[, bmi := predict(lmm1, newdata = .SD)]
-plot_lmm1 <- ggplot(data = observed_sample_data, aes(x = age, y = bmi)) +
-    theme_bw() +
-    facet_wrap(~id) +
+for (i in 1:n_pages) {
+  p <- ggplot(df_plot, aes(x = age, y = bmi)) +
+    geom_line() +
     geom_point() +
-    geom_line(data = pred_grid1, color = "blue")
-plot_lmm1
-```
-
-We can also compare the fitted model to the true curves.
-
-```{r}
-plot_lmm1 + geom_line(data = sample_data)
-```
-
-## Estimate the AUC based on the fitted linear mixed model
-Using the predicted BMI values from the linear mixed model we can obtain the AUC
-for each individual according to the fitted linear mixed model:
-
-```{r}
-est_AUC1 <- pred_grid1[, .(AUC = calc_AUC(age, bmi)), by = id]
-est_AUC1
-```
-
-We can compare the estimated individual AUC's to the true individual AUC's. The
-black dots are the true individual AUC's and the blue dots are the estimated
-ones. The red curve illustrates the estimation error.
-
-```{r}
-AUC_error1 <- merge(true_AUC[, .(id, true_AUC = AUC)], est_AUC1[, .(id, est_AUC = AUC)], by = "id")
-AUC_error1[, error := true_AUC-est_AUC]
-ggplot(AUC_error1, aes(x = id)) +
+    scale_x_continuous(limits = c(40, 65)) +
+    ggforce::facet_wrap_paginate(~ id, ncol = 5, nrow = 4) +
     theme_bw() +
-    geom_segment(aes(xend = id, y = true_AUC, yend = est_AUC), col = "red") + 
-    geom_point(aes(y = true_AUC), col = "black") +
-    geom_point(aes(y = est_AUC), col = "blue")  +
-    ylab("AUC")
-```
-
-We can also look at the bias and the variance of the estimator:
-
-```{r}
-mean(true_AUC[, AUC] -est_AUC1[, AUC]) # Bias
-var(est_AUC1[, AUC]) # standard deviation 
-```
-
-But I think we need to think a bit about how we compare performance, because
-this is looking at the bias and variance across individuals.
-
-# Calculate AUC
-
-```{r}
-fun_auc <- function(data) {
-  
-  data %>%
-    arrange(id, age) %>%
-    group_by(id) %>%
-    mutate(next_age = lead(age),
-           next_bmi = lead(bmi),
-           auc = if_else(!is.na(next_age), 0.5 * (bmi + next_bmi) * (next_age - age), NA_real_)) %>%
-    ungroup()
+    theme(text = element_text(size = 18)) +
+    labs(title = "BMI", x = "Age", y = "BMI")
+  print(p)
 }
-
-observed_sample_data <- 
-  fun_auc(observed_sample_data) %>% 
-  rename('observed_auc' = 'auc')
-
-sample_data <- 
-  fun_auc(sample_data) %>% 
-  rename('true_auc' = 'auc') %>% 
-  merge(., observed_sample_data[,c('id', 'age', 'observed_auc')], by = c('id', 'age'), all = TRUE)
+dev.off()
 ```
 
-
-# Prediction
-
-## Linear mixed model
+## Plot the interval
 ```{r}
-# linear mixed model
-lmm <- lmer(observed_auc ~ age + I(age^2) + (1 + age | id), data = sample_data, REML = FALSE)
-
-# predicting auc and sum up per individual
-auc <- 
-  sample_data %>% 
-  subset(age != 60) %>% # no next_bmi to compute true_auc
-  mutate(predicted_auc = predict(lmm, newdata = sample_data, re.form = ~ (1 + age_centered | id))) %>%
-  group_by(id) %>%
-  summarise(true_auc = sum(true_auc, na.rm = T),
-           predicted_auc = sum(predicted_auc))
+colnames(summary_statistics)
+df_plot <- subset(summary_statistics, Number_of_BMI_measurements == 2)
 ```
-
-
-
-```{r}
-# Calculate Mean Squared Error (MSE)
-auc <- auc %>% mutate(MSE = (predicted_auc - true_auc)^2)
-
-boxplot(auc$MSE, 
-        main = "MSE of Predicted AUC vs. True AUC",
-        ylab = "MSE")
-
-cat("Median MSE:", median(auc$MSE), "\n")
-```
-
-
 
