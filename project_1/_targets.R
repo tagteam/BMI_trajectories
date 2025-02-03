@@ -3,9 +3,9 @@
 ## Author: Thomas Alexander Gerds
 ## Created: Apr 24 2024 (11:55) 
 ## Version: 
-## Last-Updated: Oct 25 2024 (12:20) 
+## Last-Updated: Feb  3 2025 (13:21) 
 ##           By: Thomas Alexander Gerds
-##     Update #: 22
+##     Update #: 24
 #----------------------------------------------------------------------
 ## 
 ### Commentary: 
@@ -48,7 +48,11 @@ list(
         out <- observed[sample,on = c("id","statistic")]
         out[,Number_of_BMI_measurements := factor(Number_of_BMI_measurements)]
         out        
-    })
+    }),
+    tar_target(rmse_trends,{
+        plot_rmse_trend(summary_statistics = summary_statistics)
+    },packages = "dplyr")
+
 )
 
 
