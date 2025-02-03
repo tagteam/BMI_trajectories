@@ -21,7 +21,7 @@ simulate_BMI <- function(n){
     # loop across individuals
     do.call(rbind, lapply(1:n, function(ii){
         # BMI is observed at a random number of ages
-        number_age_observations = sample(1:7,size = 1)
+        number_age_observations = sample(1:40,size = 1)
         out =  data.table(id = ii, age = age_grid, type = "latent")
         # sample observation ages
         out[sample(1:.N,size = number_age_observations),type := "observed"]

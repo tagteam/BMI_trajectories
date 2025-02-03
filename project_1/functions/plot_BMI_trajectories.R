@@ -15,7 +15,7 @@
 ## 
 ### Code:
 plot_BMI_trajectories <- function(sample_data){
-    ggplot(sample_data[1:100, ], aes(x = age, y = bmi, group = id)) +
+    ggplot(sample_data[1:5, ], aes(x = age, y = bmi, group = id)) +
         theme_bw() +
         geom_line(col = "gray") +
         geom_point(data = sample_data[type == "observed"]) + 
